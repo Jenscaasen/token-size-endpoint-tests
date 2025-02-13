@@ -20,11 +20,13 @@ def load_saved_connections() -> Dict[str, Dict[str, str]]:
 
 def save_connection(config: Dict[str, str], name: str) -> None:
     """Save a connection configuration to JSON file."""
-    # Load existing connections as a list
+    # Load existing connections and ensure they are in list format
     if os.path.exists(CONNECTIONS_FILE):
         with open(CONNECTIONS_FILE, 'r') as f:
             try:
                 connections = json.load(f)
+                if isinstance(connections, dict):
+                    connections = [{"name": k, "config": v} for k, v in connections.items()]
             except json.JSONDecodeError:
                 connections = []
     else:
@@ -147,8 +149,8 @@ def make_api_request(config: Dict[str, str], token_content: str, token_size: str
             
             # Calculate metrics
             time_to_first = round(first_token_time - start_time, 2) if first_token_time else 0
-            time_to_last = round(last_token_time - start_time, 2) if last_token_time else 0
-            tokens_per_second = round(int(token_size) / time_to_last, 2) if time_to_last > 0 else 0
+            time_interval = round(last_token_time - first_token_time, 2) if first_token_time and last_token_time else 0
+            tokens_per_second = round(token_count / time_interval, 2) if time_interval > 0 else 0
             
             # Create or append results to measurement_results.csv
             csv_file = 'measurement_results.csv'
@@ -157,12 +159,12 @@ def make_api_request(config: Dict[str, str], token_content: str, token_size: str
             with open(csv_file, 'a') as f:
                 # Write header if file is new
                 if not file_exists:
-                    f.write('server,model,token_size,tokens_per_second,time_to_first_token,time_to_last_token,date_time\n')
+                    f.write('server,model,token_size,tokens_per_second,time_to_first_token,time_interval,date_time\n')
                 
                 # Get current date and time
                 current_dt = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 # Write results with date and time
-                f.write(f"\n{config['base_url']},{config['model_name']},{token_size},{tokens_per_second},{time_to_first},{time_to_last},{current_dt}")
+                f.write(f"\n{config['base_url']},{config['model_name']},{token_size},{tokens_per_second},{time_to_first},{time_interval},{current_dt}")
                 
            # Offer to save the connection if this is a new connection
             if not REUSED_CONNECTION:
